@@ -94,7 +94,6 @@ func TestExpandEnv(t *testing.T) {
 			output: 42,
 			label:  "variabled-format-2",
 		},
-
 		{
 			input:  "${ENV_42_5:number}",
 			output: 42.5,
