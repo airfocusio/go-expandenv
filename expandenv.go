@@ -76,17 +76,18 @@ func ExpandEnv(input interface{}) (interface{}, error) {
 }
 
 func expandEnvValue(str string) (interface{}, error) {
-	regex := regexp.MustCompile(`^\$\{(?P<name>[^:]+)(?::(?P<format>number|boolean|string))?(?::-(?P<fallback>.*))?\}$`)
+	regex := regexp.MustCompile(`^\$\{(?P<name>[^:]+)(?P<hasFormat>:(?P<format>number|boolean|string))?(?P<hasFallback>:-(?P<fallback>.*))?\}$`)
 	p := regex.FindStringSubmatch(str)
 	if p == nil {
 		return nil, fmt.Errorf("could not parse %s", str)
 	}
 	name := p[regex.SubexpIndex("name")]
 	format := p[regex.SubexpIndex("format")]
+	hasFallback := p[regex.SubexpIndex("hasFallback")] != ""
 	fallback := p[regex.SubexpIndex("fallback")]
 	value, ok := os.LookupEnv(name)
 	if !ok {
-		if fallback == "" {
+		if !hasFallback {
 			return nil, fmt.Errorf("environment variable %s is missing", name)
 		} else {
 			value = fallback
@@ -101,7 +102,11 @@ func expandEnvValue(str string) (interface{}, error) {
 	case "number":
 		formatted, err := strconv.Atoi(value)
 		if err != nil {
-			return nil, fmt.Errorf("%s is not a valid number", value)
+			formatted, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return nil, fmt.Errorf("%s is not a valid number", value)
+			}
+			return formatted, nil
 		}
 		return formatted, nil
 	case "boolean":

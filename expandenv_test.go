@@ -14,6 +14,7 @@ func TestExpandEnv(t *testing.T) {
 	os.Setenv("ENV_A", "a")
 	os.Setenv("ENV_B", "b")
 	os.Setenv("ENV_42", "42")
+	os.Setenv("ENV_42_5", "42.5")
 	os.Setenv("ENV_YES", "yes")
 	os.Setenv("ENV_MULTI_LINE", "line1\nline2")
 
@@ -91,12 +92,18 @@ func TestExpandEnv(t *testing.T) {
 		{
 			input:  "${ENV_42:number}",
 			output: 42,
-			label:  "variabled-format",
+			label:  "variabled-format-2",
+		},
+
+		{
+			input:  "${ENV_42_5:number}",
+			output: 42.5,
+			label:  "variabled-format-3",
 		},
 		{
 			input:  "${ENV_YES:boolean}",
 			output: true,
-			label:  "variabled-format-2",
+			label:  "variabled-format-4",
 		},
 		{
 			input:  "${ENV_42:boolean}",
@@ -111,14 +118,19 @@ func TestExpandEnv(t *testing.T) {
 			error:  fmt.Errorf("environment variable ENV_UNKNOWN is missing"),
 		},
 		{
-			input:  "foo: some ${ENV_A} ${ENV_B:-fallback}",
-			output: "foo: some a b",
+			input:  "foo: some ${ENV_A} |${ENV_B:-fallback}|",
+			output: "foo: some a |b|",
 			label:  "variabled-fallback",
 		},
 		{
-			input:  "foo: some ${ENV_A} ${ENV_UNKNOWN:-fallback}",
-			output: "foo: some a fallback",
-			label:  "variabled-fallback-unknown",
+			input:  "foo: some ${ENV_A} |${ENV_UNKNOWN:-fallback}|",
+			output: "foo: some a |fallback|",
+			label:  "variabled-fallback-1",
+		},
+		{
+			input:  "foo: some ${ENV_A} |${ENV_UNKNOWN:-}|",
+			output: "foo: some a ||",
+			label:  "variabled-fallback-2",
 		},
 	}
 
