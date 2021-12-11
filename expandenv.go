@@ -8,15 +8,30 @@ import (
 	"strings"
 )
 
+func environMap() map[string]string {
+	result := map[string]string{}
+	for _, entry := range os.Environ() {
+		splitted := strings.SplitN(entry, "=", 2)
+		key := splitted[0]
+		value := splitted[1]
+		result[key] = value
+	}
+	return result
+}
+
 func ExpandEnv(input interface{}) (interface{}, error) {
+	return Expand(input, environMap())
+}
+
+func Expand(input interface{}, values map[string]string) (interface{}, error) {
 	singleRegex := regexp.MustCompile(`^\$\{[^\}]+\}$`)
-	detectRegex := regexp.MustCompile(`(?:^|[^\\])\$\{[^\}]+\}`)
+	detectRegex := regexp.MustCompile(`\\?\$\{[^\}]+\}`)
 	var recursion func(current interface{}) (interface{}, []error)
 	recursion = func(current interface{}) (interface{}, []error) {
 		if current, ok := current.(string); ok {
 			p := singleRegex.FindStringSubmatch(current)
 			if p != nil {
-				expanded, err := expandEnvValue(current)
+				expanded, err := expandEnvValue(current, values)
 				if err != nil {
 					return current, []error{err}
 				}
@@ -24,17 +39,17 @@ func ExpandEnv(input interface{}) (interface{}, error) {
 			}
 			errs := []error{}
 			expanded := detectRegex.ReplaceAllStringFunc(current, func(str string) string {
-				index := strings.IndexAny(str, "$")
-				prefix := str[:index]
-				value := str[index:]
+				if strings.HasPrefix(str, "\\") {
+					return str[1:]
+				}
 
-				expanded, err := expandEnvValue(value)
+				expanded, err := expandEnvValue(str, values)
 				if err != nil {
 					errs = append(errs, err)
 					return str
 				}
 
-				return fmt.Sprintf("%s%v", prefix, expanded)
+				return fmt.Sprintf("%v", expanded)
 			})
 			return expanded, errs
 		}
@@ -75,7 +90,7 @@ func ExpandEnv(input interface{}) (interface{}, error) {
 	return output, nil
 }
 
-func expandEnvValue(str string) (interface{}, error) {
+func expandEnvValue(str string, values map[string]string) (interface{}, error) {
 	regex := regexp.MustCompile(`^\$\{(?P<name>[^:]+)(?P<hasFormat>:(?P<format>number|boolean|string))?(?P<hasFallback>:-(?P<fallback>.*))?\}$`)
 	p := regex.FindStringSubmatch(str)
 	if p == nil {
@@ -85,7 +100,7 @@ func expandEnvValue(str string) (interface{}, error) {
 	format := p[regex.SubexpIndex("format")]
 	hasFallback := p[regex.SubexpIndex("hasFallback")] != ""
 	fallback := p[regex.SubexpIndex("fallback")]
-	value, ok := os.LookupEnv(name)
+	value, ok := values[name]
 	if !ok {
 		if !hasFallback {
 			return nil, fmt.Errorf("environment variable %s is missing", name)

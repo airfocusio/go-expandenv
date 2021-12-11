@@ -10,13 +10,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestExpandEnv(t *testing.T) {
-	os.Setenv("ENV_A", "a")
-	os.Setenv("ENV_B", "b")
-	os.Setenv("ENV_42", "42")
-	os.Setenv("ENV_42_5", "42.5")
-	os.Setenv("ENV_YES", "yes")
-	os.Setenv("ENV_MULTI_LINE", "line1\nline2")
+func TestExpand(t *testing.T) {
+	values := map[string]string{
+		"ENV_A":          "a",
+		"ENV_B":          "b",
+		"ENV_42":         "42",
+		"ENV_42_5":       "42.5",
+		"ENV_YES":        "yes",
+		"ENV_MULTI_LINE": "line1\nline2",
+	}
 
 	testCases := []struct {
 		input  interface{}
@@ -71,12 +73,12 @@ func TestExpandEnv(t *testing.T) {
 		},
 		{
 			input:  "\\${ENV_A}",
-			output: "\\${ENV_A}",
+			output: "${ENV_A}",
 			label:  "variabled-escacped-string",
 		},
 		{
 			input:  "prefix \\${ENV_A} suffix",
-			output: "prefix \\${ENV_A} suffix",
+			output: "prefix ${ENV_A} suffix",
 			label:  "variabled-escacped-string-2",
 		},
 		{
@@ -134,6 +136,39 @@ func TestExpandEnv(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		output, err := Expand(testCase.input, values)
+		if testCase.error == nil {
+			assert.NoError(t, err, testCase.label)
+		} else {
+			assert.EqualError(t, err, testCase.error.Error(), testCase.label)
+		}
+		assert.Equal(t, testCase.output, output, testCase.label)
+	}
+}
+
+func TestExpandEnv(t *testing.T) {
+	os.Setenv("ENV_A", "a")
+	os.Setenv("ENV_B", "b")
+
+	testCases := []struct {
+		input  interface{}
+		output interface{}
+		label  string
+		error  error
+	}{
+		{
+			input:  "${ENV_A}",
+			output: "a",
+			label:  "variabled-string",
+		},
+		{
+			input:  "prefix ${ENV_B} suffix",
+			output: "prefix b suffix",
+			label:  "variabled-string-2",
+		},
+	}
+
+	for _, testCase := range testCases {
 		output, err := ExpandEnv(testCase.input)
 		if testCase.error == nil {
 			assert.NoError(t, err, testCase.label)
@@ -144,9 +179,11 @@ func TestExpandEnv(t *testing.T) {
 	}
 }
 
-func TestExpandEnvWithYaml(t *testing.T) {
-	os.Setenv("ENV_A", "a")
-	os.Setenv("ENV_MULTI_LINE", "line1\nline2")
+func TestExpandWithYaml(t *testing.T) {
+	values := map[string]string{
+		"ENV_A":          "a",
+		"ENV_MULTI_LINE": "line1\nline2",
+	}
 
 	yamlBytes := []byte(`
 a: ${ENV_A}
@@ -157,11 +194,12 @@ c:
 d: ${ENV_MULTI_LINE}
 e: ${ENV_UNKNOWN}
 f: \${ENV_ESCAPED}
+g: \\${ENV_ESCAPED}
 `)
 	var yamlRaw interface{}
 	err := yaml.Unmarshal(yamlBytes, &yamlRaw)
 	assert.NoError(t, err)
-	yamlRaw, err = ExpandEnv(yamlRaw)
+	yamlRaw, err = Expand(yamlRaw, values)
 	assert.EqualError(t, err, "environment variable ENV_UNKNOWN is missing")
 	yamlBytes, err = yaml.Marshal(yamlRaw)
 	assert.NoError(t, err)
@@ -174,6 +212,7 @@ d: |-
     line1
     line2
 e: ${ENV_UNKNOWN}
-f: \${ENV_ESCAPED}
+f: ${ENV_ESCAPED}
+g: \${ENV_ESCAPED}
 `, string(yamlBytes))
 }
