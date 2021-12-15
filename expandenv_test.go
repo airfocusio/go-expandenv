@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestExpand(t *testing.T) {
+func TestExpandMap(t *testing.T) {
 	values := map[string]string{
 		"ENV_A":          "a",
 		"ENV_B":          "b",
@@ -116,7 +116,7 @@ func TestExpand(t *testing.T) {
 			input:  "foo: some ${ENV_A} ${ENV_UNKNOWN}",
 			output: "foo: some a ${ENV_UNKNOWN}",
 			label:  "variabled-unknown",
-			error:  fmt.Errorf("environment variable ENV_UNKNOWN is missing"),
+			error:  fmt.Errorf("variable ENV_UNKNOWN is missing"),
 		},
 		{
 			input:  "foo: some ${ENV_A} |${ENV_B:-fallback}|",
@@ -136,7 +136,7 @@ func TestExpand(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		output, err := Expand(testCase.input, values)
+		output, err := ExpandMap(testCase.input, values)
 		if testCase.error == nil {
 			assert.NoError(t, err, testCase.label)
 		} else {
@@ -166,6 +166,12 @@ func TestExpandEnv(t *testing.T) {
 			output: "prefix b suffix",
 			label:  "variabled-string-2",
 		},
+		{
+			input:  "foo: some ${ENV_A} ${ENV_UNKNOWN}",
+			output: "foo: some a ${ENV_UNKNOWN}",
+			label:  "variabled-unknown",
+			error:  fmt.Errorf("environment variable ENV_UNKNOWN is missing"),
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -179,7 +185,7 @@ func TestExpandEnv(t *testing.T) {
 	}
 }
 
-func TestExpandWithYaml(t *testing.T) {
+func TestExpandMapWithYaml(t *testing.T) {
 	values := map[string]string{
 		"ENV_A":          "a",
 		"ENV_MULTI_LINE": "line1\nline2",
@@ -199,8 +205,8 @@ g: \\${ENV_ESCAPED}
 	var yamlRaw interface{}
 	err := yaml.Unmarshal(yamlBytes, &yamlRaw)
 	assert.NoError(t, err)
-	yamlRaw, err = Expand(yamlRaw, values)
-	assert.EqualError(t, err, "environment variable ENV_UNKNOWN is missing")
+	yamlRaw, err = ExpandMap(yamlRaw, values)
+	assert.EqualError(t, err, "variable ENV_UNKNOWN is missing")
 	yamlBytes, err = yaml.Marshal(yamlRaw)
 	assert.NoError(t, err)
 	assert.Equal(t, `a: a
