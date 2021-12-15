@@ -8,25 +8,25 @@ import (
 	"strings"
 )
 
-type VariableLookup = func(key string) (string, error)
+type VariableLookup = func(key string) (*string, error)
 
 func ExpandEnv(input interface{}) (interface{}, error) {
-	return Expand(input, func(key string) (string, error) {
+	return Expand(input, func(key string) (*string, error) {
 		value, ok := os.LookupEnv(key)
 		if !ok {
-			return "", fmt.Errorf("environment variable %s is missing", key)
+			return nil, fmt.Errorf("environment variable %s is missing", key)
 		}
-		return value, nil
+		return &value, nil
 	})
 }
 
 func ExpandMap(input interface{}, values map[string]string) (interface{}, error) {
-	return Expand(input, func(key string) (string, error) {
+	return Expand(input, func(key string) (*string, error) {
 		value, ok := values[key]
 		if !ok {
-			return "", fmt.Errorf("variable %s is missing", key)
+			return nil, fmt.Errorf("variable %s is missing", key)
 		}
-		return value, nil
+		return &value, nil
 	})
 }
 
@@ -112,27 +112,31 @@ func expandValue(str string, values VariableLookup) (interface{}, error) {
 		if !hasFallback {
 			return nil, err
 		} else {
-			value = fallback
+			value = &fallback
 		}
+	}
+
+	if value == nil {
+		return str, nil
 	}
 
 	switch format {
 	case "":
-		return value, nil
+		return *value, nil
 	case "string":
-		return value, nil
+		return *value, nil
 	case "number":
-		formatted, err := strconv.Atoi(value)
+		formatted, err := strconv.Atoi(*value)
 		if err != nil {
-			formatted, err := strconv.ParseFloat(value, 64)
+			formatted, err := strconv.ParseFloat(*value, 64)
 			if err != nil {
-				return nil, fmt.Errorf("%s is not a valid number", value)
+				return nil, fmt.Errorf("%s is not a valid number", *value)
 			}
 			return formatted, nil
 		}
 		return formatted, nil
 	case "boolean":
-		switch value {
+		switch *value {
 		case "0":
 			return false, nil
 		case "1":
@@ -146,7 +150,7 @@ func expandValue(str string, values VariableLookup) (interface{}, error) {
 		case "yes":
 			return true, nil
 		default:
-			return nil, fmt.Errorf("%s is not a valid boolean", value)
+			return nil, fmt.Errorf("%s is not a valid boolean", *value)
 		}
 	default:
 		return nil, fmt.Errorf("format %s is not supported", format)
