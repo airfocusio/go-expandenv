@@ -1,6 +1,6 @@
 module github.com/airfocusio/go-expandenv
 
-go 1.17
+go 1.21
 
 require (
 	github.com/stretchr/testify v1.5.1
